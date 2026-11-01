@@ -291,3 +291,301 @@
 - 帮助中心（中/英文）
 - 一键部署（install.sh + Docker Compose + Nginx）与后台运维命令行工具
 - License 生成工具（licgen，Windows）
+
+---
+
+# 🇬🇧 English Documentation
+
+# Changelog
+
+This file records user-facing changes, newest first.
+
+> Internal implementation details, root-cause analyses, and documentation maintenance notes are not tracked here.
+
+---
+
+## [v1.9.1] - 2026-11-01
+
+### Changed
+
+- **User management now uses a tenant sidebar on the left and a user list on the right**: the right pane shows only the users of the selected tenant, and "All tenants" returns to the global view. The sidebar filters by name, domain, or tenant ID and selects a tenant when you press Enter.
+- New users default to the tenant selected in the sidebar; with "All tenants" active the field stays empty and must be chosen explicitly, so accounts are no longer created under the wrong tenant — a mistake that previously required deleting and recreating the account.
+- **Branding now follows the system name**: the marketing site's brand name, copyright line, page title, description, and share-card title all read System Settings → System Name, so on-premises deployments can display the customer's own name.
+- The console browser tab title and login page heading are generated from "<system name> + Simulation Console" when not customized, and the copyright line is composed from the system name and the current year instead of a hardcoded product name.
+- Marketing site layout refinements: tighter top spacing after anchor jumps, subtitle removed from the hero, section copy rewritten in a more formal tone, and the version number removed from the footer.
+
+### Fixed
+
+- The marketing site no longer flashes the default brand name on reload: the name stays hidden until system settings load, and is cached locally so returning visitors see it immediately.
+- Fixed `install.sh` misjudging the database pre-check, which could report an existing database as missing, or abort on an empty server as if another database were present.
+- When the target database is missing but the host still holds an old data directory, the installer now warns that this looks like unmigrated old data rather than a fresh deployment, and that continuing would create an empty database.
+
+---
+
+## [v1.9.0] - 2026-10-31
+
+### Added
+
+- **Marketing website (optional)**: a static product site that can be deployed on the same machine as the product, with copy changes requiring no rebuild. `install.sh --with-site` publishes it, `--no-site` retracts it, and no flag keeps the current state. The release package always ships `site/`; customer on-premises instances keep it disabled and `/` still opens the console.
+- **Scheduled campaign start**: campaigns can be booked to start at a future time (not earlier than the next full minute) and the booking can be cancelled. The scheduler starts them automatically, and a failure sends a notification. The list gained a "Scheduled" state.
+- **Ready-to-use content library**: the first initialization imports 85 lure email templates with 85 matching landing pages, plus 22 micro-courses, 107 questions, and their images, so a campaign can be built immediately after installation.
+- **Version visibility**: `phishgenix-server -version` and `phishgenix-cli -version` neither read the database nor `.env`, so they work even when the configuration is broken. The first line of the startup log carries the version.
+- `phishgenix-cli tenant update` gained domain, quota, campaign approval, and trusted parameters.
+
+### Changed
+
+- **Product renamed to PhishGenix**: UI copy, emails and reports, help documentation, binary and package names, service name, default install path, and database name all use the new name.
+- System settings were reorganized into sub-tabs (security settings and system license are each split), and each block saves independently.
+- Entry points consolidated: the free-trial entry now lives only on the marketing site, and "Login" is uniformly labelled "Console" there.
+- The user management action column is fixed to three items with the rest under "More"; historical and disabled service plans are restricted to deletion only.
+
+### Fixed
+
+- Fixed installation failures or abruptly truncated output on brand-new machines: MySQL readiness is now judged by container lifecycle with timed waits, and migrations retry up to 3 times.
+- Fixed "deployment reported success but login fails" after upgrades: the target database is verified before the backend starts, created automatically when absent and no other business database exists, and installation aborts with clear guidance when the situation is ambiguous.
+- Fixed campaigns saving successfully without a configured system access root URL, which left employees without a learning link after submission.
+- Fixed re-running the installer on an instance that already publishes the marketing site taking the site offline.
+- Fixed campaigns being paused for no reason by job status write conflicts, and an automatic retry path that never actually took effect.
+- Fixed domains remaining occupied after deleting a tenant from the recycle bin.
+- Fixed metered plans being blocked incorrectly by comparing plan-level recipient totals with the license per-campaign limit.
+
+### Upgrade Notes
+
+- **The rename is a breaking change**: old deployment identifiers, old learning links, old DNS verification records, and old backup file names are incompatible. Existing environments should be treated as fresh deployments.
+- **Home page moved**: the product home moved from `/` to `/dashboard`. Without the marketing site, `/` redirects automatically and existing bookmarks keep working.
+- **The marketing site is disabled by default**: do not add `--no-site` when upgrading an instance that already publishes it, or the site will be taken offline.
+- **Bundled templates and courses are imported once**: later releases do not update them on installed instances, and content an administrator deleted is not restored.
+- **Self-registration is open by default**: new instances ship `ALLOW_SELF_REGISTRATION=true` in `.env`; existing `.env` files are never overwritten.
+
+---
+
+## [v1.8.0] - 2026-10-21
+
+### Added
+
+- **Built-in free license**: initialization succeeds and the product is usable without importing a license certificate, running on built-in quotas (1 tenant, 5 users, 1 SMTP gateway, 50 recipients per campaign, 500 recipients in total, 1 concurrent campaign). Only custom templates are enabled under this license; AI, template import and cloning, backup and restore, report export, UI customization, multi-language, micro-courses, and self-registration stay disabled.
+- An expired commercial license no longer stops the service; the system falls back to the built-in quotas and clearly states this at the top of the system settings page.
+- **Micro-courses and self-registration are now license-gated**: without the entitlement, their entry points and APIs become unavailable, and new or edited campaigns offer only "custom external link" as a learning step while existing campaigns keep their configuration.
+- **AI capabilities are now license-gated**: without the entitlement, the analytics "AI Usage" tab is disabled with an explanation.
+
+### Changed
+
+- License checks now require both an activated certificate and a true flag; inactive, expired, and clock-rollback states are consistently treated as unlicensed.
+- The license page shows micro-course and self-registration status, and reports "built-in free license" as the source when no certificate is present.
+- The repository no longer bundles a demo license file, and local development also runs on the built-in license.
+
+### Fixed
+
+- Added HTML sanitization to rich-text rendering (legal documents, micro-course editing and viewing, and the course portal), fixing script injection from externally imported course content. The allowlist blocks `iframe`, `script`, and `style`, and rejects `data:` inline resources.
+- The free-trial entry on the login page no longer appears with a delay.
+
+### Upgrade Notes
+
+- Environments using micro-courses or self-registration must reissue a certificate containing the corresponding flags; a certificate without them counts as unlicensed. Self-registration additionally requires `ALLOW_SELF_REGISTRATION` to be true at the deployment level.
+- Without a commercial certificate the system runs on built-in quotas. Existing data beyond those quotas is not deleted, but related create operations are rejected.
+- Rich text that embedded content with `iframe` or inlined images with `data:` no longer renders after the upgrade; switch to external image links.
+
+---
+
+## [v1.7.0] - 2026-10-18
+
+### Added
+
+- **Fell-for-it → learn → quiz loop**: the learning link handed out after a simulated form submission carries a signed token, so the post-course quiz opens without an account or login. Scores and explanations appear immediately, and only the first submission counts, so retries cannot inflate results.
+- Campaign reports gained four learning metrics (learned, not learned, participation rate, quiz all-correct count) and per-person learning details, with server-side paging and one-click Excel export.
+- **Configurable learning step**: no learning, automatically recommended courses, manually selected courses, or a custom external link. Manual selection lists only published courses that have a quiz configured.
+- **Campaign environment self-check**: one click concurrently checks plan quota, tenant trusted status, SMTP gateway, targets, and groups, reporting each item as ready or not with the next action. It is read-only and can be re-run safely.
+- The target import template gained phone and job title columns, and "import into a specified company" assigns the whole batch at once. Bulk ownership changes require a company and treat department as optional.
+- System settings gained a "Global Settings" page for the system access root URL, used for learning links, notification deep links, self-registration activation links, and template thumbnails.
+
+### Changed
+
+- The "Phone" column in user management became "Email", with a matching search option.
+- The quiz question limit rose from 5 to 10, random selection defaults to 5, and manual selection allows up to 10.
+
+### Fixed
+
+- The SMTP gateway sender email no longer bypasses domain validation for the built-in sending service and now uses the same rules as third-party gateways.
+- Installer database migrations now run idempotently from a single file, fixing a failure where inline comments were extracted as part of the password and migrations silently failed.
+- Importing a CSV no longer creates a duplicated department level when the first segment matches the company name.
+- When binding an authenticator app, the account shown prefers the login email over a random `trial_` username.
+- Gateway test mails and self-registration activation mails are now HTML plus plain text, fixing garbled Chinese subjects on some mail servers.
+
+### Upgrade Notes
+
+- Environments that relied on the micro-course root URL falling back to the tracking domain must configure the address in Global Settings after upgrading, otherwise learning links and other long-lived addresses cannot be built. The absence of a fallback is intentional.
+
+---
+
+## [v1.6.0] - 2026-10-14
+
+### Added
+
+- **Free-trial self-registration**: the login page gained a free-trial entry. Visitors submit company and contact details plus a CAPTCHA, then set a password from the confirmation email to activate. Whether manual review is required is configurable by the super admin.
+- "Verify first, create later": submission only records an application. Domain and account ownership are decided when the confirmation link is opened, so a domain cannot be squatted by an abandoned application.
+- Super admins gained self-registration management: application list with status counts, details, approval, rejection, and resending the confirmation email.
+- System settings gained a self-registration tab (open mode, rate limits, domain blocklist) and a technical support setting for the contact email shown after registration.
+- Registration and activation resist enumeration and abuse, never revealing whether a domain or email is already registered.
+- **Sender account restriction**: the gateway sender email must be a full address whose domain belongs to the tenant or to the domains allowed by the current plan.
+
+### Changed
+
+- New tenants and self-registration activations default to a maximum of 1 operator.
+- The intranet address restriction moved from a permanent note to a tooltip beside the SMTP host field, with long tooltips capped at 360 px.
+
+### Fixed
+
+- Fixed agreement text on the login page being nearly unreadable when a light theme preference lingered.
+- Fixed a tenant downgraded to trial keeping its previous plan, which made trial limits ineffective.
+- Fixed "create as trial" tenants not receiving a service plan, which left them unable to create even a single target.
+- Fixed the required-field asterisk on the SMTP settings page wrapping onto its own line.
+
+---
+
+## [v1.5.0] - 2026-10-13
+
+### Added
+
+- **Login email binding**: after binding, accounts can sign in with email plus password while still supporting usernames. Unbinding requires a two-step code confirmation, and codes are limited to a 60-second cooldown, 10 per day, invalidated after 5 wrong attempts, and single-use.
+- Administrators can rebind or clear a user's login email directly from user management.
+- A "Trial" service level (the lowest tier) was added, and tenant management supports adjusting service level and quota per tenant.
+- **Tenant trust and domain verification**: campaigns of untrusted tenants are blocked at the trust gate when starting, and changing a tenant domain automatically voids existing verification.
+- A lightweight tracking role `-role=tracking` allows the tracking endpoint to be deployed separately from the management plane.
+- Users must accept the privacy policy and service agreement before signing in. When an agreement is revised, re-acceptance is required and the version and time each user accepted are recorded.
+- System settings gained a draft campaign limit (default 50, 0 means unlimited).
+
+### Changed
+
+- Notification emails use a plain layout matching the gateway test mail.
+- Campaign end times now close at 23:59:59 on the same day.
+- Idle scheduled tasks converge, substantially reducing database access during idle periods while active behavior stays unchanged.
+
+### Fixed
+
+- Fixed server logs being captured into `/var/log/messages` and growing that file continuously.
+
+---
+
+## [v1.4.0] - 2026-10-11
+
+### Added
+
+- **Notification email channel**: system settings gained a notification panel for server, port, sender address, password, display name, language, and send rate. Ports 25 / 465 / 587 automatically select the corresponding encryption.
+- The test button always sends to the configured sender and reports the failing stage plus the mail server's raw response on failure.
+- Bilingual subjects and bodies for 8 notification types. Notification mail is fully isolated from campaign sending: it never enters campaign statistics and is never polluted by bounce callbacks.
+- Delivery reliability: recoverable failures retry up to 2 times, recipients are re-validated before resending, and a channel-wide token bucket limits sending to 30 mails per minute by default.
+- The message center supports deleting selected messages, affecting only your own copy.
+- Users gained a notification email field, and the per-user email channel toggle became functional.
+
+### Changed
+
+- The message center moved from system settings to personal settings, and the system settings entry is hidden for operators.
+- Four separate intranet switches were consolidated into one "Allow intranet access" switch (off by default), and intranet validation was added for tenant SMTP gateways. Built-in sending services are not governed by this switch.
+
+### Fixed
+
+- Notification subjects, bodies, and sender display names now consistently use the system name.
+- Fixed the message list total being decremented twice, which left the last page empty.
+- Removed remaining occurrences of the old product name across UI copy, comments, and local storage keys; a one-time cross-login prompt may reappear after upgrading.
+
+### Upgrade Notes
+
+- The old intranet switches are no longer read, so intranet access returns to off after upgrading. Super admins must re-enable it once from the UI if it was previously on.
+
+---
+
+## [v1.3.0] - 2026-10-10
+
+### Added
+
+- **Notification module**: an in-app message center with a bell and unread badge in the top bar, real-time over WebSocket with polling fallback, covering campaign approval, campaign status, and service plan expiry.
+- Notification scopes are switch-controlled at both platform and user level with an "enabled when no record exists" semantic, so existing users are not silently muted by the upgrade.
+- **Analytics module**: AI usage (multi-dimensional aggregation plus call details) and target analysis (repeat victims, risk levels, overall security score).
+- Super admins can filter campaigns by tenant, with stat cards and the list following the selection.
+- The course list gained a "learn count" column, the top bar shows the current role, and landing pages are mobile-responsive.
+
+### Changed
+
+- Campaign status uses a single seven-state vocabulary shared by the list and the stat cards (draft, sending, sent, awaiting release, paused, finished, terminated).
+- The legacy tenant-level expiry field was retired; tenant availability is governed solely by the service plan period.
+
+### Fixed
+
+- Fixed "sending" statistics dropping rows, and the report banner not showing the end time and remaining duration.
+- Fixed a request storm when opening the member drawer: a 5,000-member group went from about 50 requests to 1.
+- Fixed unreadable message details in dark mode, non-responsive notification deep links, and a bulk mark-as-read endpoint that could mark everything read with empty parameters.
+- The release package now ships only `*.example` templates so locally edited configuration and certificates are never overwritten by upgrades, and `install.sh` adds the WebSocket block to existing `nginx.conf` files automatically.
+
+---
+
+## [v1.2.0] - 2026-10-07
+
+### Added
+
+- **Micro-course quizzes and question bank**: quizzes can be assembled manually or by random tag-based selection, with a preview and a diagnosis of whether enough questions are available.
+- The question bank supports single choice, multiple choice, and true/false, bilingual prompts and explanations, difficulty tags, enable/disable, and answer previews. Questions can be assigned to a course as exclusive questions.
+- AI question generation from course content: set the question-type mix and target points, review the candidates, and import them in one step.
+- **AI model scheduling**: one API base URL can hold multiple candidate models that are tried in order, with larger sort values taking priority.
+- The recycle bin gained question bank and template center entries, and "System Users" merged into "User Management".
+
+### Fixed
+
+- Security: blocked arbitrary file writes when importing course backup packages and added a state guard to permanent deletion.
+- Fixed AI question generation returning only a single tag.
+- The media library now uses "load more" and the wide-screen gap is fixed; the portal header search box, breadcrumbs, and footer adapt to narrow screens.
+
+---
+
+## [v1.1.0] - 2026-10-06
+
+### Added
+
+- **Micro-courses module**: an admin console plus a login-free course portal under `/training`, with inline image uploads and a media library, AI course generation, and categories and tags including English names.
+- An operator campaign approval mechanism, with approval status as its own column in the campaign list.
+- AI-recommended micro-courses for campaigns, with learning links optionally following the recommendation. The micro-course root URL is configurable independently of the tracking root URL.
+- Tenant-level AI model configuration, with AI runtime logs written to disk and tagged by capability.
+- Target synchronization gained Coremail APIWS V3 support.
+- A bundled course generation tool, `phishgenix-batch-courses`, ships with the release package.
+
+### Fixed
+
+- Fixed the micro-course page shaking when switching to an empty category, orphaned tag relations after deletion, and garbled Chinese file names in the media library.
+- Fixed the login page default title still showing Chinese in English environments.
+
+---
+
+## [v1.0.1] - 2026-09-05
+
+### Added
+
+- The report editor supports WYSIWYG pagination (the editing view is the print view), with outline drag-and-drop across chapters, undo/redo, version history, and concurrent-edit conflict detection.
+- AI report generation returns structured content and is launched from the editor toolbar.
+- Real-time mail queue monitoring with a top-bar indicator and a monitoring drawer.
+- Per-gateway send rate limits for SMTP gateways, with the global default moved into campaign configuration.
+- Landing page submission responses support a "success message only" mode, with all post-submission content customizable.
+- Dashboard stat cards were split into eight mutually exclusive metrics separating campaign lifecycle from delivery progress.
+
+### Fixed
+
+- Fixed orphaned jobs after a service restart stalling campaign delivery, and hardened the queue against backlogs.
+- Fixed the monitor showing a red "severe backlog" state while the queue was empty.
+- Fixed duplicate landing page submissions overwriting the first submission; the first is now kept and the handling state recorded.
+- Fixed automatic pagination and text box width in PDF report export.
+- Also: operator visibility now includes licensed dynamic group members, plus assorted editor and dark-mode styling fixes.
+
+---
+
+## [v1.0.0] - 2026-08-18
+
+First general availability release. Highlights:
+
+- Campaigns: the full email simulation workflow (creation, SMTP gateway delivery, progress control, interruption recovery)
+- Behavior tracking: opens, link clicks, landing page submissions, QR scans, and bounce callbacks
+- Email templates and landing pages: visual editors, customizable submission responses, batch template generation
+- Recipient management: departments and groups, bulk import
+- Campaign reports and export
+- Multi-tenant isolation, role-based permissions, and audit logs
+- RSA-signed license mechanism
+- Help center (Chinese and English)
+- One-click deployment (install.sh + Docker Compose + Nginx) and a backend operations CLI
+- License generation tool (licgen, Windows)
