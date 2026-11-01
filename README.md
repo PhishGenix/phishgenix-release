@@ -72,6 +72,8 @@
 
 - [数据备份与恢复](docs/backup-restore.md)
 
+- [运维指南](docs/operations.md)
+
 ## 版本更新
 
 请关注 [CHANGELOG.md](CHANGELOG.md) 或 GitHub Releases 获取版本更新信息。
@@ -154,22 +156,26 @@ Actual resource requirements depend on deployment scale.
 
 Visit [GitHub Releases](https://github.com/PhishGenix/phishgenix-release/releases) and download the appropriate deployment package.
 
-### 2. Extract
+### 2. Upload and extract
+
+Upload the package to `/home/phishgenix` on the server and extract it with `unzip`. Pick the archive that matches the server architecture (`uname -m` returns `x86_64` or `aarch64`):
 
 ```
-tar -zxvf PhishGenix-v1.0.0-linux-amd64.tar.gzcd phishgenix
+cd /home/phishgenix
+unzip phishgenix-release-amd64-<version>.zip     # x86_64 servers
+unzip phishgenix-release-arm64-<version>.zip     # ARM64 servers
 ```
 
 ### 3. Configure
 
-Create and configure the `.env` file based on `.env.example`.
-
-Configure database settings, service ports, and other required parameters.
+The one-click installer generates `server/.env` with random strong passwords and JWT secrets on first run, so manual configuration is usually unnecessary. To customize, edit `/home/phishgenix/server/.env` after installation.
 
 ### 4. Install
 
 ```
-chmod +x install.sh./install.sh
+cd /home/phishgenix
+sudo useradd phishgenix      # first install only; skip if the account already exists
+sudo ./install.sh
 ```
 
 For detailed instructions, please refer to the installation guide.
@@ -179,6 +185,8 @@ For detailed instructions, please refer to the installation guide.
 - [Installation Guide](docs/installation.md)
 
 - [Backup & Restore](docs/backup-restore.md)
+
+- [Operations Guide](docs/operations.md)
 
 ## Release Notes
 
