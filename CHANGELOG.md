@@ -6,6 +6,88 @@
 
 ---
 
+## [v1.9.5] - 2026-11-14
+
+### 新增
+
+- **帮助手册按角色提供**：帮助中心按超级管理员 / 租户管理员 / 操作员三种视角提供，分别 15 / 10 / 7 章，每个角色只看到自己有入口的功能；章节编号连续，正文交叉引用改为章节名链接，标题、封面、页眉与导出文件名均带角色后缀。超管可在页面顶部切换三种视角预览与导出。
+- **快速上手指南分平台版与租户版**：平台版含 5 步接入流程、交付清单、九项自检、常见问题与检查表，仅超管可读；租户版维持原有六步。超管可切换两本并导出。
+- **左侧菜单分组**：超管与租户管理员的菜单按「演练运营 / 安全培训 / 数据与审计 / 系统管理」归类，同一功能在不同角色下同组同位；同一时刻只展开一组，进入页面自动展开当前组，手动收起不会被弹开；整列收起时忽略分组、全部展开。
+- **邮件队列监控独立页面**：原顶栏抽屉改为独立页面（系统管理 → 邮件队列监控），含健康状态、最后更新时间、自动刷新（默认 15 秒）、四张指标卡、作业层的待处理 / 发送中 / 最老待投递与积压明细 Top 20；轮询仅在停留期间进行，刷新失败会提示并保留上次数据。
+- **首次登录引导与空状态引导**：新部署首次登录弹出一次按角色给出的下一步建议；演练列表、发信网关、目标人、演练分组、模板中心为空时给出下一步按钮或说明，无权限角色只提示联系管理员。演练环境检查新增「邮件模板」一项。
+
+### 变更
+
+- 顶栏的发信队列状态只显示「正常 / 积压 / 严重积压」三档文字，不再带具体数量，数量见监控页面。
+- 三个文档页面（快速上手 / 白皮书 / 帮助中心）头部控件顺序统一为「搜索 → 切换 → 导出 → 语言 → 主题」。
+- 引导弹窗标题统一为「温馨提示」；超管主按钮改为「执行演练环境自检」，点击直接进入自检。
+- 租户列表新增「管理员数量」列（含已停用账号，无可用管理员时标红）；用户管理左栏显示租户用户数与用量。
+
+### 修复
+
+- 修复超管退出登录时登录页误报「通知设置加载失败」。
+- 修复用户管理左栏两个列表窗口因宽度溢出重叠、演练报告页左侧菜单无高亮。
+- 修复 1366×768 及以下分辨率侧边栏底部入口无法显示。
+- 修复英文帮助手册「邮件队列监控」一节断句破损、图片插在句中。
+
+### 升级注意
+
+- 升级后需重启后端服务。
+- 帮助手册改为按角色分章随产品提供，旧版整本不再读取；现场自行维护过整本副本的，需改为分章维护。
+- 新增引导标记字段，启动时自动迁移添加，无破坏性改动；存量账号首次登录也会看到一次引导，跳过即可。
+
+---
+
+## [v1.9.4] - 2026-11-07
+
+### 新增
+
+- **可回退的版本升级链路**：新增 `upgrade.sh`，上传新版本包后一条命令完成升级，依次执行「数据库导出 → 停服 → 文件快照与校验 → 落盘 → 安装 → 健康检查」，任一步失败自动恢复到升级前；`--dry-run` 只做预检（架构、版本、磁盘空间、必需文件）。新增 `rollback.sh`，支持 `--list` / `--latest` / `--snapshot <目录>`，默认只回退程序，加 `--with-db` 才连数据库一起回退。
+- 升级快照包含数据库、配置、程序与 systemd 单元，不含上传文件目录；默认保留最近 3 份，可用 `--keep N` 调整。
+- 安装脚本新增 `--strict`：升级中数据库迁移失败或后端未在健康检查窗口内就绪会明确报错，不再静默成功。
+
+### 变更
+
+- 名称类输入统一收口：租户、用户、部门、公司、模板、分类、微课程、AI 模型名等不再接受 `\ / ; : < > " | ? *` 与不可见字符；邮件主题、报告标题等自由文本只拒不可见字符。中文、空格、括号以及 `' & , ( ) [ ] = + - @` 等正常写法不受影响。
+- 配置了表单规则的页面在失焦时即时提示；无表单规则的场景在提交或导出前拦截，不必等后端返回错误。
+
+### 修复
+
+- **演练邮件主题与纯文本正文出现乱码**：主题或纯文本正文含 `'`、`&`、`+` 等字符时，收件人会看到 `O&#39;Brien` 这类 HTML 实体。现在只有 HTML 正文继续转义，主题与纯文本按纯文本渲染，显示与填写一致。
+- 邮件头字段补齐净化：来自备份导入、EML 导入等路径，若变量携带换行，无法再插入额外的 `Bcc`、`RCPT` 行。
+- **SMTP 宿主机校验**：修复自定义宿主机使用 1025 / 2525 端口即可绕过端口限制的问题；宿主机现在按域名、IPv4 地址或主机名规则校验，1025 / 2525 仅对内置网关开放，第三方网关仍只能用 25 / 465 / 587。
+- 存量 SMTP 配置若宿主机带下划线、IPv6 字面量等不符合新规则的写法，会在下一次发送或连接测试时被拦下，需改为合法主机名或 IPv4 地址。
+
+### 升级注意
+
+- 升级后需重启后端服务。
+- 已有环境不要手工解压覆盖升级，请改用 `upgrade.sh`；现场还没有该脚本时，先从升级包中取出再执行。
+- 本次无破坏性数据库变更，升级失败可自动回退程序；`rollback.sh --with-db` 会丢弃升级后写入的数据，务必确认后再用。
+- 名称校验只作用于新增、编辑与导入：存量数据不会被自动改写，但若已有名称包含上述特殊字符，再次编辑保存时需先改名；CSV 导入改为逐行累计失败，不再因一行出错中断整批。
+
+---
+
+## [v1.9.3] - 2026-11-05
+
+### 修复
+
+- **退出登录后旧凭证仍能下载文件**：登出、改密、账号被禁用或被强制下线后，旧凭证在控制台已失效，但仍可访问文件下载地址；若凭证来自超级管理员，还可跨租户读取任意文件。现在文件服务与其他功能走同一套会话校验，凭证失效即按未登录处理，页面内联的图片、字体不受影响。
+- **历史遗留文件等同于公开目录**：早期上传、未带租户归属的文件此前对所有人无条件放行，任意扩展名都可匿名下载。现在仅图片、字体等页面内联资源允许匿名访问；其他类型需被公共模板或系统设置引用，否则匿名返回 401、登录用户返回 403，超级管理员仍可下载用于排查。此类无归属文件在现有实例中已基本清空，正常业务文件的访问不受影响。
+- **低等级租户可读取未授权的高级模板**：此前可凭模板 ID 直接读取未获授权的公共模板全文。现在详情、克隆与列表现使用同一套可见性判定，未授权访问返回 403；列表中能看到的模板不受影响。
+
+### 变更
+
+- 下线 6 项没有任何调用方的闲置功能：旧版报告详情、部门路径重算、租户域名查询、注册申请详情，以及两处旧版 AI 用量统计；这些入口已无调用，保留只会扩大可攻击面。
+- 租户记录已不存在、但此前单独授权过该租户时，克隆公共模板由「拒绝」改为「放行」，与列表展示口径一致。
+
+### 升级注意
+
+- 升级后需重启后端服务。
+- 自建脚本如仍调用被下线的 6 项能力，升级后会收到 404：报告详情与 AI 用量改用新的对应能力，其余已无替代，需移除调用。
+- 文件下载收紧后，若某个非图片文件此前依赖「无归属即公开」被外部访问，现在需要由公共模板或系统设置引用，或由超级管理员手动下载。
+
+---
+
 ## [v1.9.2] - 2026-11-03
 
 ### 新增
@@ -327,6 +409,88 @@
 This file records user-facing changes, newest first.
 
 > Internal implementation details, root-cause analyses, and documentation maintenance notes are not tracked here.
+
+---
+
+## [v1.9.5] - 2026-11-14
+
+### Added
+
+- **Role-based help manual**: the help center now offers three perspectives — super admin, tenant administrator, and operator — with 15, 10, and 7 chapters respectively, each showing only the features that role can access. Chapter numbering is continuous, cross-references link by chapter name, and the title, cover, header, and exported file name carry the role suffix. Super admins can switch between the three perspectives to preview and export.
+- **Platform and tenant quick-start guides**: the platform edition covers a five-step onboarding flow, delivery checklist, nine-item self-check, FAQs, and a checklist, and is readable only by super admins; the tenant edition keeps its original six steps. Super admins can switch between the two and export either.
+- **Sidebar grouping**: super admin and tenant administrator menus are grouped into Simulation Operations, Security Training, Data and Audit, and System Management, so the same feature stays in the same group and position across roles. Only one group is expanded at a time, the current group opens automatically, and a manually collapsed group stays collapsed; collapsing the whole sidebar ignores groups and expands everything.
+- **Dedicated mail queue monitoring page**: the former top-bar drawer is now a standalone page (System Management → Mail Queue Monitoring) with health status, last update time, auto-refresh (15 seconds by default), four metric cards, job-layer counts (pending, sending, oldest pending delivery), and the top 20 backlog entries. Polling runs only while the page is open, and a failed refresh shows a message while keeping the last successful data.
+- **First-login and empty-state guidance**: a new deployment shows a one-time guide on first login with next steps by role; the campaign list, SMTP gateways, targets, campaign groups, and template center show next-step buttons or explanations when empty, and roles without permission are only told to contact an administrator. The campaign environment check gained a "mail template" item.
+
+### Changed
+
+- The top-bar mail queue status shows only "Normal", "Backlog", or "Severe backlog" without counts; counts are on the monitoring page.
+- The document pages (quick start, whitepaper, help center) now share the header control order "Search → Switch → Export → Language → Theme".
+- The guide dialog title is unified as "Reminder", and the super admin's primary button is now "Run environment self-check", opening the self-check directly.
+- The tenant list gained an "Administrator count" column (including disabled accounts, highlighted when no administrator is available); the user management sidebar shows each tenant's user count and usage.
+
+### Fixed
+
+- Fixed the login page falsely reporting "Failed to load notification settings" when a super admin signs out.
+- Fixed overlapping list panels in the user management sidebar and the missing highlight in the campaign report sidebar.
+- Fixed the sidebar's bottom entry being unreachable at 1366×768 and below.
+- Fixed a broken sentence and a misplaced image in the English help manual's mail queue monitoring section.
+
+### Upgrade Notes
+
+- Restart the backend service after upgrading.
+- The help manual is now provided chapter by chapter per role, and the old single-volume manual is no longer read; environments that maintained their own full copy must switch to per-chapter maintenance.
+- A guide marker field is added automatically during startup migration. It is a new column with no breaking change; existing accounts also see the guide once on first login and can skip it.
+
+---
+
+## [v1.9.4] - 2026-11-07
+
+### Added
+
+- **Reversible upgrade path**: `upgrade.sh` completes an upgrade with one command after the new package is uploaded, running database export, service stop, file snapshot and verification, deployment, installation, and health checks in sequence, and restoring the pre-upgrade state if any step fails; `--dry-run` performs pre-checks only (architecture, version, disk space, required files). `rollback.sh` supports `--list`, `--latest`, and `--snapshot <directory>`, rolling back code only by default, or code and database together with `--with-db`.
+- Upgrade snapshots include the database, configuration, programs, and systemd units, but not the upload directory; the latest three are kept by default, adjustable with `--keep N`.
+- The installer gained `--strict`: a failed database migration or a backend that does not become ready within the health-check window now reports an explicit error instead of succeeding silently.
+
+### Changed
+
+- Name inputs are unified: tenant, user, department, company, template, category, micro-course, and AI model names no longer accept `\ / ; : < > " | ? *` or invisible characters; free-text fields such as email subjects and report titles reject only invisible characters. Chinese characters, spaces, brackets, and normal symbols such as `' & , ( ) [ ] = + - @` are unaffected.
+- Pages with form rules now validate on blur; scenarios without form rules are blocked before submission or export instead of waiting for a backend error.
+
+### Fixed
+
+- **Garbled subjects and plain-text bodies in campaign emails**: when a subject or plain-text body contained `'`, `&`, or `+`, recipients saw HTML entities such as `O&#39;Brien`. Only HTML bodies are now escaped; subjects and plain-text content render as plain text, matching what was entered.
+- Mail header fields are now sanitized: paths that bypass form validation, such as backup and EML imports, can no longer inject extra `Bcc` or `RCPT` lines through newlines in variables.
+- **SMTP host validation**: fixed custom hosts bypassing the port restriction by using port 1025 or 2525; hosts are now validated as a domain, IPv4 address, or hostname, ports 1025 and 2525 are reserved for the built-in gateway, and third-party gateways can still use only 25, 465, or 587.
+- Existing SMTP configurations whose host contains underscores, IPv6 literals, or other forms that fail the new rules are blocked on the next send or connection test and must be changed to a valid hostname or IPv4 address.
+
+### Upgrade Notes
+
+- Restart the backend service after upgrading.
+- Do not overwrite an existing installation by extracting manually; use `upgrade.sh`. If the script is not present, extract it from the upgrade package first.
+- This release has no breaking database change, and a failed upgrade can roll back the code automatically; `rollback.sh --with-db` discards data written after the upgrade, so confirm before using it.
+- Name validation applies only to creation, editing, and import: existing data is not rewritten, but a name containing the characters above must be renamed before it can be edited and saved again; CSV import now accumulates per-row failures instead of aborting the whole batch on one error.
+
+---
+
+## [v1.9.3] - 2026-11-05
+
+### Fixed
+
+- **Old credentials could still download files after signing out**: after sign-out, a password change, account disabling, or a forced logout, old credentials no longer worked in the console but could still access file download addresses; if they belonged to a super admin, they could read files across tenants. The file service now uses the same session validation as other features, inactive credentials are treated as signed out, and inline images and fonts on the page are unaffected.
+- **Legacy files without a tenant acted as a public directory**: files uploaded early without tenant ownership were previously served to everyone, and any extension could be downloaded anonymously. Now only inline resources such as images and fonts allow anonymous access; other types must be referenced by a public template or system setting, otherwise anonymous requests receive 401 and signed-in users receive 403, while super admins can still download them for troubleshooting. Such unowned files have largely been cleared from existing instances, and normal business files are unaffected.
+- **Low-tier tenants could read unauthorized advanced templates**: a template ID could previously be used to read the full text of a public template that the tenant was not entitled to. Details, cloning, and listing now share one visibility check, unauthorized access returns 403, and templates visible in the list are unaffected.
+
+### Changed
+
+- Retired six unused capabilities with no callers: legacy report details, department path recalculation, tenant domain lookup, registration application details, and two legacy AI usage statistics; none are used anymore, and keeping them only widened the attack surface.
+- When a tenant record no longer exists but was previously granted individual access, cloning a public template now succeeds instead of being rejected, matching the listing behavior.
+
+### Upgrade Notes
+
+- Restart the backend service after upgrading.
+- Custom scripts that still call the six retired capabilities receive 404 after upgrading: use the corresponding new capabilities for report details and AI usage, and remove calls with no replacement.
+- After the file download tightening, a non-image file that relied on "unowned means public" for external access now needs to be referenced by a public template or system setting, or downloaded manually by a super admin.
 
 ---
 
