@@ -132,7 +132,7 @@ unzip phishgenix-release-arm64-<版本>.zip     # ARM64 服务器
 
 若生产服务器处于**无互联网访问的纯内网或隔离环境**，`install.sh` 执行 `docker compose up -d` 时将无法从公网拉取 MySQL、Redis、Nginx、Postfix、Mailpit 等中间件镜像，导致容器启动失败。此时需在运行一键配置脚本之前，预先导入离线镜像。
 
-**① 准备离线镜像包**：在一台能联网且已部署 PhishGenix 的机器上，使用备份脚本导出镜像（详见[数据备份与恢复](docs/backup-restore.md)）：
+**① 准备离线镜像包**：在一台能联网且已部署 PhishGenix 的机器上，使用备份脚本导出镜像（详见[备份与恢复操作指南](backup-restore.md)）：
 
 ```bash
 /home/phishgenix/deploy/backup/phishgenix-backup.sh --export-images
@@ -303,6 +303,64 @@ sudo ENABLE_MARKETING_SITE=0 ./install.sh
   docker logs -f phish_postfix
   ```
 
+### 4.3 版本升级与回退
+
+> [!WARNING]
+> **不要再手工 `unzip -o` 到 `/home/phishgenix` 做升级**：解压会在任何备份发生之前覆盖旧程序，出问题只能靠整机灾备恢复。升级统一走 `upgrade.sh`，它先生成可校验的快照，再落盘，失败时可自动回退。
+
+#### 1. 升级前检查
+
+- 确认磁盘空间充足：快照包含数据库 dump 与程序文件，建议预留压缩包体积的 4 倍以上。
+- 确认 `systemctl is-active phishgenix` 为 `active`，且 `docker ps` 中 `phish_mysql` 正在运行。
+- 照常做一次整机灾备备份（见[备份与恢复操作指南](backup-restore.md) 第 2 节）。**升级快照不替代灾备备份**，它不含 `data/uploads`。
+- 上传与目标服务器 CPU 架构匹配的 `phishgenix-release-<arch>-<版本>.zip`；若同目录还有 `SHA256SUMS`，校验会自动进行。
+
+#### 2. 执行升级（建议先预检）
+
+```bash
+cd /home/phishgenix
+sudo ./upgrade.sh phishgenix-release-amd64-<版本>.zip --dry-run   # 只做预检，不改动已安装的程序与配置
+sudo ./upgrade.sh phishgenix-release-amd64-<版本>.zip
+```
+
+ARM64 服务器把文件名换成 `phishgenix-release-arm64-<版本>.zip`。脚本依次完成：在线数据库 dump → 停服 → 文件快照与校验 → 落盘 → 执行 `install.sh --strict` → 健康检查（最多 90 秒）→ 写 manifest。
+
+现场还没有 `upgrade.sh`（首次使用新版升级链路）时，用包内脚本自举：
+
+```bash
+unzip -p phishgenix-release-amd64-<版本>.zip upgrade.sh > /tmp/phishgenix-upgrade.sh
+sudo bash /tmp/phishgenix-upgrade.sh /home/phishgenix/phishgenix-release-amd64-<版本>.zip
+```
+
+#### 3. 升级后验证
+
+```bash
+cat /home/phishgenix/VERSION
+curl -fsS http://127.0.0.1:8080/api/public/settings   # system_version 应为新版本
+sudo /home/phishgenix/rollback.sh --list               # 确认快照已登记
+```
+
+#### 4. 回退
+
+```bash
+sudo /home/phishgenix/rollback.sh --latest             # 默认只回退程序，数据库不动
+sudo /home/phishgenix/rollback.sh --latest --with-db   # 连数据库一起回退（破坏性）
+```
+
+`--with-db` 会先对当前库做一次安全 dump，再导入升级前的 dump，**升级后写入的数据会丢失**，需交互输入 `yes` 确认。发行包声明 `db.rollback=restore-required`（含破坏性 DDL）时，脚本会拒绝「只回退程序」；声明 `unsupported` 时应优先前向修复而不是回退。
+
+#### 5. 常用选项
+
+| 选项 | 说明 |
+| -------------------- | ------------------------------------------- |
+| `--with-site` / `--no-site` | 透传给 `install.sh`，默认保持现状（见 3.7） |
+| `--no-auto-rollback` | 升级失败时只保留现场，不自动回退 |
+| `--keep N` | 保留最近 N 份快照，默认 3 |
+| `--skip-db-backup` | 跳过数据库 dump，仅测试环境可用 |
+| `--allow-downgrade` | 允许安装同版本或更低版本 |
+
+手工 `unzip -o` 仍然可用，但**不会生成升级快照，也没有自动回退能力**，仅建议用于全新安装。
+
 ---
 
 # 🇬🇧 English Documentation
@@ -441,7 +499,7 @@ unzip phishgenix-release-arm64-<version>.zip     # ARM64 servers
 
 If the production server has **no internet access (pure intranet or air-gapped environment)**, `install.sh` cannot pull the MySQL, Redis, Nginx, Postfix, and Mailpit images from public registries during `docker compose up -d`, and the containers fail to start. In that case, import the offline images before running the one-click script.
 
-**① Prepare the offline image bundle**: on a machine that has internet access and a working PhishGenix deployment, export the images with the backup script (see [Backup & Restore](docs/backup-restore.md)):
+**① Prepare the offline image bundle**: on a machine that has internet access and a working PhishGenix deployment, export the images with the backup script (see the [Backup and Restore Guide](backup-restore.md)):
 
 ```bash
 /home/phishgenix/deploy/backup/phishgenix-backup.sh --export-images
@@ -612,3 +670,61 @@ The Go backend is managed by systemd, so its standard output is collected by jou
   docker logs -f phish_mysql
   docker logs -f phish_postfix
   ```
+
+### 4.3 Upgrading and rolling back
+
+> [!WARNING]
+> **Do not upgrade by manually running `unzip -o` into `/home/phishgenix`.** Extraction overwrites the old program before any backup exists, so a failure can only be recovered through whole-machine disaster recovery. Always upgrade through `upgrade.sh`: it creates a verifiable snapshot first, then writes the new files, and rolls back automatically on failure.
+
+#### 1. Pre-upgrade checks
+
+- Make sure there is enough disk space. A snapshot contains a database dump and the program files, so reserve at least four times the size of the release archive.
+- Confirm that `systemctl is-active phishgenix` returns `active` and that `phish_mysql` is running in `docker ps`.
+- Take a whole-machine disaster recovery backup as usual (see section 2 of the [Backup and Restore Guide](backup-restore.md)). **An upgrade snapshot is not a substitute for that backup** — it does not include `data/uploads`.
+- Upload the `phishgenix-release-<arch>-<version>.zip` that matches the server CPU architecture. If a `SHA256SUMS` file sits in the same directory, verification runs automatically.
+
+#### 2. Run the upgrade (a dry run first is recommended)
+
+```bash
+cd /home/phishgenix
+sudo ./upgrade.sh phishgenix-release-amd64-<version>.zip --dry-run   # Preflight only, installed program and configuration untouched
+sudo ./upgrade.sh phishgenix-release-amd64-<version>.zip
+```
+
+On ARM64 servers use `phishgenix-release-arm64-<version>.zip` instead. The script runs these steps in order: online database dump → stop services → file snapshot and verification → write files → run `install.sh --strict` → health check (up to 90 seconds) → write the manifest.
+
+If `upgrade.sh` does not exist on the machine yet (the first time this upgrade path is used), bootstrap it from the archive:
+
+```bash
+unzip -p phishgenix-release-amd64-<version>.zip upgrade.sh > /tmp/phishgenix-upgrade.sh
+sudo bash /tmp/phishgenix-upgrade.sh /home/phishgenix/phishgenix-release-amd64-<version>.zip
+```
+
+#### 3. Post-upgrade verification
+
+```bash
+cat /home/phishgenix/VERSION
+curl -fsS http://127.0.0.1:8080/api/public/settings   # system_version should be the new version
+sudo /home/phishgenix/rollback.sh --list               # Confirm the snapshot is registered
+```
+
+#### 4. Rollback
+
+```bash
+sudo /home/phishgenix/rollback.sh --latest             # Program only by default, database untouched
+sudo /home/phishgenix/rollback.sh --latest --with-db   # Roll back the database too (destructive)
+```
+
+`--with-db` first dumps the current database as a safety copy, then imports the pre-upgrade dump. **Data written after the upgrade is lost**, and you must type `yes` to confirm. When the release declares `db.rollback=restore-required` (destructive DDL involved), the script refuses to roll back the program alone; when it declares `unsupported`, fix forward instead of rolling back.
+
+#### 5. Common options
+
+| Option | Description |
+| -------------------- | ------------------------------------------- |
+| `--with-site` / `--no-site` | Passed through to `install.sh`; current state is kept by default (see 3.7) |
+| `--no-auto-rollback` | Keep the failed state on disk instead of rolling back automatically |
+| `--keep N` | Keep the most recent N snapshots (default 3) |
+| `--skip-db-backup` | Skip the database dump; test environments only |
+| `--allow-downgrade` | Allow installing the same or a lower version |
+
+Manual `unzip -o` still works, but it **creates no upgrade snapshot and offers no automatic rollback**, so it is only recommended for fresh installations.
