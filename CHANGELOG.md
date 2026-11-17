@@ -6,6 +6,42 @@
 
 ---
 
+## [v1.9.6] - 2026-11-17
+
+### 新增
+
+- **找回密码自助重置**：登录页新增「忘记密码」，输入用户名或已绑定邮箱后，重置链接发至该邮箱，30 分钟内有效且仅可使用一次；链接经邮件安全网关预扫描不会被提前作废。找回密码页始终要求图形验证码；邮箱未验证、账号停用、邮件发送不可用或请求过于频繁时，弹窗给出下一步处理建议，不暴露限流层级与剩余时间。超管可在「系统设置 → 用户安全策略」关闭「启用找回密码」（默认开启）；关闭后入口隐藏、相关请求一律拒绝，已发出的链接同时失效，重新开启后立即恢复。
+- **登录图形验证码与发送频率可配**：「系统设置 → 用户安全策略 → 登录防爆破策略」新增「启用登录图形验证码」（默认关闭），开启后登录须先答题，题目一次性有效、点击即换、登录失败自动换新。新增「找回密码与邮箱验证频率」分组，同账号发送间隔与每日上限、全平台每日上限等五项可调，超出范围的值保存时即被拦截。找回密码与图形验证码的限流可在「接口访问控制」中单独调整，获取验证码不占用登录额度。
+- **顶栏自检与创建演练预检**：顶栏新增自检状态条——超管查看平台自检，租户管理员与操作员查看演练环境自检；通过 / 待处理 / 未通过三档配色，仅有未通过项时提示叹号，点击就地展开抽屉。顶栏、演练列表与自检抽屉展示同一份结论，不再互相矛盾。新建演练抽屉顶部加入五项创建前预检，缺项即禁用保存并提供「去配置」入口，全部通过时给出确认。分享自检链接后，打开时按角色自动展开对应抽屉。平台自检不再将控制台来源列为必检项，标准同源部署不再出现红色项。
+- **创建演练后的下一步与灰度试投**：创建成功后提示「立即启动 / 预约发送 / 稍后再说」（开启审批的租户为「去提交审批」），并说明当前仍为草稿及实际发信时机。「先小范围试投」默认开启但不自动选人，提示先指定试投范围；试投人数与勾选状态保持一致。
+- **模板、分组与演练互跳**：模板与收件人分组列表新增「用此模板发起演练」/「发起演练」，直接打开预填好的新建演练抽屉；公共库模板的「复制新建」由「更多」菜单移为固定按钮。新建演练未选模板时，跳转直接落到公共库视图。
+- **目标人导入与租户创建收尾**：导入结果弹窗新增「导出失败明细」与「去建分组」，导出内容与页面显示一致；导入模板示例域名改为 `example.com`。创建租户后弹出收尾清单并标注未完成步骤，租户列表新增「就绪状态」列；用户管理左栏的用户数与「缺管理员」提示在用户增删改后即时刷新。
+
+### 变更
+
+- 目标人、演练活动、平台管理与租户用户相关的错误提示改为按界面语言返回，中文界面不再夹英文；缺失的英译与白皮书、快速上手空态一并补齐。
+- 演练列表、目标人等页面的环境提示改为「一行结论 + 自检入口」，明细统一收进自检抽屉。
+- 演练活动、目标人、发信网关、模板中心与租户管理页面新增「本页帮助」，直达帮助中心对应章节。
+- 发信网关、目标人同步、AI 模型配置与通知邮件 SMTP 的内网地址拦截提示补全设置路径与开关名称。
+
+### 修复
+
+- 修复清空「CORS 允许来源」后包括登录在内的请求被拒绝：控制台自身来源始终放行，白名单仅用于指定其他允许来源。
+- 修复动态分组成员数被放大：勾选部门时不再计入无关联的公司成员，组织节点无法解析成员时按 0 人处理；存量分组仍按原意识别，无需重建。
+- 修复演练投递尾部偶发自动暂停：重试中的邮件不再被误判为投递中断。
+- 修复投递自愈过程中个别作业被置为永久「待处理」的问题，改为下个周期继续重试。
+- 修复找回密码 / 重置密码页右上角按钮位置与主题切换方向异常。
+
+### 升级注意
+
+- 找回密码的一次性链接保存在 Redis；未配置 Redis 时仅单实例有效。多实例部署请确保 Redis 可用；后端重启后尚未使用的链接会失效，让用户重新发起即可。
+- 本次仅新增系统设置项，无数据库结构调整；默认值与升级前行为一致（找回密码开启、登录验证码关闭），无需立即操作。
+- 开启「启用登录图形验证码」后，所有账号登录均需答题；依赖脚本或第三方集成自动登录的部署请勿开启，或改为人工登录后再操作。
+- 发信网关不在本机且使用内网地址时，仍需保持「允许访问内网」开启；本版仅修正提示路径，拦截行为不变。
+- 升级时请按部署指南完成前端资源替换。
+
+---
+
 ## [v1.9.5] - 2026-11-14
 
 ### 新增
@@ -409,6 +445,42 @@
 This file records user-facing changes, newest first.
 
 > Internal implementation details, root-cause analyses, and documentation maintenance notes are not tracked here.
+
+---
+
+## [v1.9.6] - 2026-11-17
+
+### Added
+
+- **Self-service password reset**: the login page gained a "Forgot password" entry. Enter a username or bound email address and a reset link is sent to that address, valid for 30 minutes and usable once; a pre-click scan by a secure email gateway does not consume the link. The reset page always requires a CAPTCHA. When the account has no verified email, is disabled, mail delivery is unavailable, or requests are too frequent, a dialog offers a concrete next step without exposing rate-limit tiers or remaining seconds. Super admins can switch off the whole flow with "Enable password reset" under System Settings → User Security Policy (on by default). While off, the entry is hidden, all related requests are rejected, and links already issued stop working; re-enabling restores the flow immediately.
+- **Configurable login CAPTCHA and sending frequency**: "Enable login CAPTCHA" was added under System Settings → User Security Policy → Login Brute-force Protection (off by default). When on, users must solve a CAPTCHA before signing in; each challenge is single-use, clicking the image loads a new one, and a failed login loads a new one automatically. A "Password reset and email verification frequency" group exposes five adjustable limits — the per-account resend interval and daily cap, the platform-wide daily cap, and the per-user interval and daily cap for email verification codes — with out-of-range values rejected on save. Password-reset and CAPTCHA rate limits can be tuned separately under Access Control, and fetching a CAPTCHA does not consume the login allowance.
+- **Top-bar self-check and pre-campaign checks**: a self-check status strip was added to the top bar — platform self-check for super admins, campaign environment check for tenant administrators and operators. It uses three states (passed / pending attention / failed), shows an exclamation mark only when an item actually fails, and opens the drawer in place when clicked. The top bar, campaign list, and self-check drawer show the same conclusion instead of contradicting each other. The new-campaign drawer now runs five pre-creation checks: a missing item disables saving and offers a "Go to settings" link, while all items passing shows a confirmation. Opening a shared self-check link expands the corresponding drawer by role. The platform self-check no longer treats the console's own origin as a required item, so standard same-origin deployments no longer show a red item.
+- **Next steps after campaign creation and trial sending**: creating a campaign now offers "Start now", "Schedule send", or "Later" ("Submit for approval" when approval is enabled), and explains that the campaign is still a draft and when mail will actually go out. "Send a small trial first" is on by default but selects nobody, prompting you to set the trial audience; the selection and its count stay in sync.
+- **Template, group, and campaign cross-navigation**: template and recipient group rows gained "Start a campaign with this template" / "Start a campaign", opening a pre-filled new-campaign drawer. "Copy and create" for public library templates moved out of the "More" menu into a fixed button. When a new campaign has no template selected, the jump lands directly on the public library view.
+- **Target import and tenant creation follow-up**: the import result dialog gained "Export failures" and "Create a group"; the exported CSV matches what is shown on screen, and the import template's sample domain is now `example.com`. Creating a tenant shows a follow-up checklist with outstanding steps and their entry points, and the tenant list gained a "Readiness" column. The user count and "no administrator" hint in the user management sidebar refresh immediately after users are added, changed, or removed.
+
+### Changed
+
+- Error messages for targets, campaigns, platform management, and tenant users are returned in the interface language instead of English, so Chinese interfaces no longer mix in English text; missing English translations and empty states in the whitepaper and quick-start guide were filled in as well.
+- Environment hints on the campaign list, targets, and similar pages became "one-line conclusion + self-check entry", with details consolidated into the self-check drawer.
+- Campaigns, targets, SMTP gateways, the template center, and tenant management gained a "Page help" link next to the title, jumping to the matching help center chapter.
+- Internal-address blocking hints for SMTP gateways, target synchronization, AI model configuration, and notification email SMTP now include the complete settings path and switch name.
+
+### Fixed
+
+- Fixed requests, including login, being rejected after the "CORS allowed origins" list was cleared: the console's own origin is always allowed, and the allowlist now only specifies additional origins.
+- Fixed inflated member counts in dynamic groups: selecting a department no longer includes unrelated company members, and an organization node whose members cannot be resolved counts as zero instead of expanding to all tenants. Existing groups are interpreted as before and need no rebuilding.
+- Fixed campaigns occasionally pausing near the end of delivery: messages being retried are no longer mistaken for an interrupted delivery.
+- Fixed individual jobs being left permanently pending during delivery self-healing; they are now retried in the next cycle.
+- Fixed the position of the top-right buttons and the theme toggle direction on the password-reset and password-recovery pages.
+
+### Upgrade Notes
+
+- Password-reset one-time links are stored in Redis; without Redis, they work in a single instance only. Ensure Redis is available in multi-instance deployments; links not yet used are invalidated when the backend restarts, so ask the user to request a new one.
+- This release only adds system settings and involves no database schema change. Defaults match the previous behavior (password reset on, login CAPTCHA off), so no immediate action is needed.
+- Once "Enable login CAPTCHA" is on, every account must solve a challenge to sign in. Deployments relying on scripts or third-party integrations for automated login should leave it off or switch to manual login.
+- When an SMTP gateway is off-host and uses an internal address, keep "Allow internal network access" enabled. This release only corrects the hint path; blocking behavior is unchanged.
+- Replace the front-end assets as described in the deployment guide when upgrading.
 
 ---
 
